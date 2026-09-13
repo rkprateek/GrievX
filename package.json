@@ -1,0 +1,17 @@
+{
+  "name": "grievx",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "dev:admin": "npm --workspace @grievx/admin run dev",
+    "dev:mobile": "npm --workspace @grievx/mobile run start",
+    "build:admin": "npm --workspace @grievx/admin run build",
+    "check:admin": "npm --workspace @grievx/admin run lint",
+    "check:mobile": "npm --workspace @grievx/mobile run typecheck"
+  },
+  "engines": {
+    "node": ">=20.18.0",
+    "npm": ">=10.0.0"
+  }
+}

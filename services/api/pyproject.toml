@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "grievx-api"
+version = "0.1.0"
+description = "GrievX FastAPI service"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115,<0.116",
+  "uvicorn[standard]>=0.32,<0.33",
+  "sqlalchemy[asyncio]>=2.0.36,<2.1",
+  "asyncpg>=0.30,<0.31",
+  "redis>=5.2,<6",
+  "boto3>=1.35,<2",
+  "pydantic-settings>=2.7,<3"
+]
+
+[project.optional-dependencies]
+dev = [
+  "aiosqlite>=0.20,<0.22",
+  "httpx>=0.28,<0.29",
+  "pytest>=8.3,<9",
+  "pytest-asyncio>=0.24,<0.26"
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = ["integration: requires a running external service"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"

@@ -11,6 +11,7 @@ __pycache__/
 
 # JavaScript / React Native / Next.js
 node_modules/
+.expo/
 .next/
 dist/
 expo/
