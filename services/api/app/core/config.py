@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     s3_secret_access_key: str
     s3_bucket: str = "grievx-uploads"
     s3_region: str = "us-east-1"
+    jwt_secret_key: str
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 60
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
