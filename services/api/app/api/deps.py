@@ -3,6 +3,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.config import get_settings
 from app.core.security import decode_access_token
@@ -26,7 +27,11 @@ async def get_current_user(
     except (JWTError, ValueError):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
 
-    user = await db.scalar(select(User).where(User.id == user_id, User.is_active.is_(True)))
+    user = await db.scalar(
+        select(User)
+        .options(selectinload(User.role), selectinload(User.department))
+        .where(User.id == user_id, User.is_active.is_(True))
+    )
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid user")
     return user
