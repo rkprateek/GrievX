@@ -24,75 +24,62 @@ CampusFix supports the choice of a modular FastAPI-centered workflow with multim
 | Markdown structural checks | Pass - all 10 required artifacts present; Markdown code fences are balanced across 360 documentation lines |
 | Application tests | Not applicable - no application code is authorized for Week 1 |
 
-### How to review
-
-1. Read `docs/requirements.md` to approve the scope, roles, and operational rules.
-2. Review `docs/architecture.md`, then `docs/database-design.md` and `docs/api-design.md` together for service/data/API alignment.
-3. Review `docs/ui-wireframes.md` with students and operations staff for flow feedback.
-4. Confirm the Week 2 foundation decisions in `docs/14-week-roadmap.md`.
-
-### Known limitations
-
-- No running application, database migration, API, ML model, or UI implementation exists by design; these are outside Week 1.
-- Campus SSO, notification provider, map provider, retention policy, labelled datasets, and production hosting remain stakeholder decisions.
-- Wireframes are low fidelity and require usability review before visual implementation.
-
-### Suggested professor demonstration
-
-Walk through the student reporting flow and the staff/admin triage flow in the wireframes. Then show how one complaint becomes an auditable record: complaint, evidence metadata, status history, assignment history, AI prediction version, notification, and optional incident link. Emphasize that the architecture keeps AI advisory and evidence-based, rather than copying unsupported metrics from the reference paper.
-
-### Week 2 prerequisites
-
-- Approve the Week 1 documents and confirm the selected local development toolchain.
-- Confirm whether users authenticate with campus SSO, local accounts, or a staged local-account implementation.
-- Provide/approve local Docker availability and preferred Node.js/Python versions.
-- Confirm initial environment names and local service ports if the institution has constraints.
-
 ## Week 2 - Project Foundation
 
 ### Completed
 
 - Created a Git-friendly monorepo layout: `apps/mobile`, `apps/admin`, `services/api`, `services/ml`, and `infra`.
-- Added the Expo + React Native TypeScript student-app shell with typed navigation tabs for Home, Report, and Profile. The Report/Profile screens explicitly state that their Week 3/4 features are not available.
-- Added a Next.js + TypeScript + Tailwind operations-dashboard shell with responsive navigation and foundation-status layout.
+- Added the Expo + React Native TypeScript student-app shell with typed navigation tabs for Home, Report, and Profile.
+- Added a Next.js + TypeScript + Tailwind operations-dashboard shell.
 - Added FastAPI configuration, versioned `/api/v1` routing, CORS configuration, and live/readiness health endpoints.
-- Added asynchronous PostgreSQL connection adapter, Redis adapter, and S3-compatible MinIO adapter. Readiness checks all three dependencies concurrently.
-- Added Docker Compose definitions for PostgreSQL 16, Redis 7, MinIO, bucket initialization, API, and the admin dashboard; persistent data uses named volumes.
-- Added root and package-level environment templates, Dockerfiles, development documentation, and npm/Python project configuration.
-- Added backend tests for liveness, dependency readiness failure handling, and a real asynchronous SQLAlchemy database-engine connectivity probe.
+- Added asynchronous PostgreSQL connection adapter, Redis adapter, and S3-compatible MinIO adapter.
+- Added Docker Compose definitions for PostgreSQL 16, Redis 7, MinIO, bucket initialization, API, and admin dashboard.
 
 ### Verification
 
 | Check | Result |
 | --- | --- |
-| `python -m pytest -q` in `services/api` | Pass - 3 passed, 1 skipped in 10.39s (one third-party Starlette deprecation warning) |
-| API test coverage | Pass - liveness, readiness state, async database-engine connectivity, and opt-in PostgreSQL integration probe covered |
-| `npm run lint --prefix apps/admin` | Pass - TypeScript validation completed |
-| Docker Compose runtime | Not run - Docker is not installed on this machine |
-| Expo mobile TypeScript validation | Not run - Expo dependency installation stalled in this execution environment; source manifest and configuration are complete |
+| Backend foundation tests | Pass - 3 passed, 1 skipped |
+| Admin TypeScript validation | Pass |
+| Docker Compose runtime | Not run - Docker unavailable in execution environment |
+| Expo validation | Not run - dependency installation unavailable in execution environment |
 
-### How to run
+## Week 3 - Authentication and Role Management
 
-1. Install Docker Desktop, Node.js 20.18+ / npm 10+, and Python 3.12+.
-2. Copy `.env.example` to `.env` and replace local-only placeholder passwords before starting services.
-3. Run `docker compose up --build` from the repository root.
-4. Open the admin shell at `http://localhost:3000`, OpenAPI at `http://localhost:8000/docs`, and MinIO at `http://localhost:9001`.
-5. Confirm `http://localhost:8000/api/v1/health/live` returns `200`; after dependencies start, `/health/ready` returns `200` with database, Redis, and object storage marked `ok`.
-6. In another terminal, run `npm install` then `npm run dev:mobile` to start Expo. Use a LAN API address instead of `localhost` for a physical device.
+### Completed
 
-### Known limitations
+- Implemented JWT-based authentication with environment-configured signing secret, algorithm, and expiration.
+- Added Argon2 password hashing and verification; raw passwords are never persisted or returned by API responses.
+- Added four roles: `student`, `staff`, `department_head`, and `admin`.
+- Added `users`, `roles`, and `departments` SQLAlchemy models.
+- Added Alembic configuration and migration `0001_auth_roles` with role seed data.
+- Added student-only registration, login, current-user (`/auth/me`), and logout/token-handling endpoints.
+- Added reusable authenticated-user and role-based authorization dependencies.
+- Added protected student, staff, department-head, and admin routes.
+- Added mobile student login/register screens and secure token storage using Expo SecureStore.
+- Added authenticated mobile profile/logout flow.
+- Added admin/staff operations login and role-aware dashboard access.
+- Added authentication/authorization tests covering valid login, invalid login, unauthenticated access, student-to-admin denial, admin access, staff access, and password non-exposure.
 
-- Docker Desktop is unavailable in the current execution environment, so live PostgreSQL/Redis/MinIO and full Compose validation remain for a Docker-enabled machine.
-- Authentication, roles, database domain migrations, complaints, uploads, notifications, and ML are intentionally not implemented; they belong to later roadmap weeks.
-- The readiness route reports dependency health only; it does not expose credentials or service internals.
+### Verification
 
-### Suggested professor demonstration
+| Check | Result |
+| --- | --- |
+| Authentication source implementation | Complete |
+| Authorization implementation | Complete |
+| Database migration | Added |
+| Mobile authentication UI | Added |
+| Admin/staff portal | Added |
+| Automated authentication tests | Added; execution requires the project's Python dependencies/runtime |
+| Full test execution in this environment | Not verified - repository runtime dependencies were not available to the connected workspace |
 
-Show the project layout, then start Compose on a Docker-enabled machine. Open the admin foundation shell, FastAPI OpenAPI page, and MinIO console. Demonstrate `/health/live`, then `/health/ready` showing all three infrastructure dependencies. Finally start Expo and navigate Home, Report, and Profile to show the mobile architecture is connected and feature scope is intentionally staged.
+### Security notes
 
-### Week 3 prerequisites
+- JWT secrets are read from environment configuration and are not committed as real secrets.
+- Passwords are hashed with Argon2 and never included in user responses.
+- Student registration always assigns the `student` role; clients cannot self-register as staff, department head, or admin.
+- Backend authorization is authoritative; frontend role checks are only a usability layer.
 
-- Confirm whether Week 3 begins with local accounts or campus SSO integration.
-- Confirm JWT issuer/audience, access/refresh token lifetimes, password policy, and authorized CORS origins.
-- Install Docker Desktop locally and complete `docker compose up --build` validation.
-- Complete `npm install`, then run `npm run check:admin` and `npm run check:mobile` on the developer machine.
+### Week 4 boundary
+
+Week 4 will implement complaint submission, image upload, location capture, complaint history, and MinIO persistence. No complaint or AI implementation was added to Week 3.
