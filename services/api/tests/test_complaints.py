@@ -74,7 +74,8 @@ async def complaint_client(tmp_path):
 
 def auth_header(user_id: str) -> dict[str, str]:
     settings = Settings(database_url="sqlite+aiosqlite://", redis_url="redis://localhost:6379/0", s3_endpoint_url="http://localhost:9000", s3_access_key_id="test", s3_secret_access_key="test", jwt_secret_key="test-secret-for-complaints")
-    return {"Authorization": f"Bearer {create_access_token(user_id, "student", settings)}"}
+    token = create_access_token(user_id, "student", settings)
+    return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.mark.asyncio
