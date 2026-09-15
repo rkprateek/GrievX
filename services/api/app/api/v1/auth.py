@@ -1,10 +1,9 @@
-from datetime import datetime, timezone
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials
-from jose import JWTError, jwt
+from jose import JWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import bearer, get_current_user
 from app.core.config import get_settings
@@ -47,7 +46,11 @@ async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db))
 
 @router.post("/login", response_model=TokenResponse)
 async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
-    user = await db.scalar(select(User).where(User.email == payload.email.lower()))
+    user = await db.scalar(
+        select(User)
+        .options(selectinload(User.role), selectinload(User.department))
+        .where(User.email == payload.email.lower())
+    )
     if user is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if not user.is_active:
@@ -68,7 +71,7 @@ async def logout(
     if credentials is None:
         raise HTTPException(status_code=401, detail="Authentication required")
     try:
-        payload = decode_access_token(credentials.credentials, get_settings())
+        decode_access_token(credentials.credentials, get_settings())
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     # JWTs are short-lived and stateless. The client must discard the token on logout.
