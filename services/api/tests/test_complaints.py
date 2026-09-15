@@ -1,7 +1,4 @@
 import io
-import os
-
-os.environ.setdefault("JWT_SECRET_KEY", "test-secret-for-complaints")
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -52,9 +49,13 @@ async def complaint_client(tmp_path):
         student_id, other_id = student.id, other.id
 
     settings = Settings(
-        database_url=f"sqlite+aiosqlite:///{db_path}", redis_url="redis://localhost:6379/0",
-        s3_endpoint_url="http://localhost:9000", s3_access_key_id="test", s3_secret_access_key="test",
-        jwt_secret_key="test-secret-for-complaints", max_complaint_image_size_bytes=1024 * 1024,
+        database_url=f"sqlite+aiosqlite:///{db_path}",
+        redis_url="redis://localhost:6379/0",
+        s3_endpoint_url="http://localhost:9000",
+        s3_access_key_id="test",
+        s3_secret_access_key="test",
+        jwt_secret_key="test-secret-for-tests-only",
+        max_complaint_image_size_bytes=1024 * 1024,
     )
     app = create_app(settings)
     storage = FakeStorage()
@@ -73,7 +74,14 @@ async def complaint_client(tmp_path):
 
 
 def auth_header(user_id: str) -> dict[str, str]:
-    settings = Settings(database_url="sqlite+aiosqlite://", redis_url="redis://localhost:6379/0", s3_endpoint_url="http://localhost:9000", s3_access_key_id="test", s3_secret_access_key="test", jwt_secret_key="test-secret-for-complaints")
+    settings = Settings(
+        database_url="sqlite+aiosqlite://",
+        redis_url="redis://localhost:6379/0",
+        s3_endpoint_url="http://localhost:9000",
+        s3_access_key_id="test",
+        s3_secret_access_key="test",
+        jwt_secret_key="test-secret-for-tests-only",
+    )
     token = create_access_token(user_id, "student", settings)
     return {"Authorization": f"Bearer {token}"}
 
@@ -81,7 +89,17 @@ def auth_header(user_id: str) -> dict[str, str]:
 @pytest.mark.asyncio
 async def test_valid_complaint_and_retrieval(complaint_client):
     client, storage, session_factory, student_id, _ = complaint_client
-    response = await client.post("/api/v1/complaints", headers=auth_header(student_id), data={"description": "Broken light near the library entrance", "latitude": "12.9716", "longitude": "77.5946", "location_label": "Library"}, files={"image": ("evidence.png", png_bytes(), "image/png")})
+    response = await client.post(
+        "/api/v1/complaints",
+        headers=auth_header(student_id),
+        data={
+            "description": "Broken light near the library entrance",
+            "latitude": "12.9716",
+            "longitude": "77.5946",
+            "location_label": "Library",
+        },
+        files={"image": ("evidence.png", png_bytes(), "image/png")},
+    )
     assert response.status_code == 201
     payload = response.json()
     assert payload["status"] == "SUBMITTED"
@@ -102,14 +120,27 @@ async def test_valid_complaint_and_retrieval(complaint_client):
 @pytest.mark.asyncio
 async def test_missing_description(complaint_client):
     client, _, _, student_id, _ = complaint_client
-    response = await client.post("/api/v1/complaints", headers=auth_header(student_id), data={"description": "short", "latitude": "12.9", "longitude": "77.5"})
+    response = await client.post(
+        "/api/v1/complaints",
+        headers=auth_header(student_id),
+        data={"description": "short", "latitude": "12.9", "longitude": "77.5"},
+    )
     assert response.status_code == 422
 
 
 @pytest.mark.asyncio
 async def test_invalid_image(complaint_client):
     client, storage, _, student_id, _ = complaint_client
-    response = await client.post("/api/v1/complaints", headers=auth_header(student_id), data={"description": "This is a valid complaint description", "latitude": "12.9", "longitude": "77.5"}, files={"image": ("bad.svg", b"<svg></svg>", "image/svg+xml")})
+    response = await client.post(
+        "/api/v1/complaints",
+        headers=auth_header(student_id),
+        data={
+            "description": "This is a valid complaint description",
+            "latitude": "12.9",
+            "longitude": "77.5",
+        },
+        files={"image": ("bad.svg", b"<svg></svg>", "image/svg+xml")},
+    )
     assert response.status_code == 415
     assert storage.objects == {}
 
@@ -117,14 +148,30 @@ async def test_invalid_image(complaint_client):
 @pytest.mark.asyncio
 async def test_unauthorized_submission(complaint_client):
     client, _, _, _, _ = complaint_client
-    response = await client.post("/api/v1/complaints", data={"description": "This is a valid complaint description", "latitude": "12.9", "longitude": "77.5"})
+    response = await client.post(
+        "/api/v1/complaints",
+        data={
+            "description": "This is a valid complaint description",
+            "latitude": "12.9",
+            "longitude": "77.5",
+        },
+    )
     assert response.status_code == 401
 
 
 @pytest.mark.asyncio
 async def test_student_only_sees_own_complaints(complaint_client):
     client, _, _, student_id, other_id = complaint_client
-    created = await client.post("/api/v1/complaints", headers=auth_header(student_id), data={"description": "Water leakage outside the laboratory", "latitude": "12.9", "longitude": "77.5"})
+    created = await client.post(
+        "/api/v1/complaints",
+        headers=auth_header(student_id),
+        data={
+            "description": "Water leakage outside the laboratory",
+            "latitude": "12.9",
+            "longitude": "77.5",
+        },
+    )
+    assert created.status_code == 201
     complaint_id = created.json()["id"]
     forbidden_lookup = await client.get(f"/api/v1/complaints/{complaint_id}", headers=auth_header(other_id))
     assert forbidden_lookup.status_code == 404
