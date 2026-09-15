@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.access import router as access_router
 from app.api.v1.auth import router as auth_router
+from app.api.v1.complaints import router as complaints_router
 from app.api.v1.health import router as health_router
 from app.core.config import Settings, get_settings
 from app.infrastructure.database import check_database_connection, create_database_engine
@@ -27,6 +28,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             app_settings.s3_secret_access_key,
             app_settings.s3_region,
         )
+        app.state.storage_client = storage_client
+        app.state.s3_bucket = app_settings.s3_bucket
 
         async def storage_check() -> None:
             await asyncio.to_thread(check_storage_connection, storage_client, app_settings.s3_bucket)
@@ -53,6 +56,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health_router, prefix="/api/v1")
     app.include_router(auth_router, prefix="/api/v1")
     app.include_router(access_router, prefix="/api/v1")
+    app.include_router(complaints_router, prefix="/api/v1")
     return app
 
 
