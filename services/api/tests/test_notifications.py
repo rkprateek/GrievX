@@ -179,14 +179,10 @@ async def test_notification_creation_and_authorization(lifecycle_client, setting
     assert forbidden.status_code == 404
 
     async with session_factory() as session:
-        count = await session.scalar(
-            select(Notification).where(
-                Notification.recipient_user_id == ids["student"],
-                Notification.complaint_id.is_not(None),
-            ).count()
-            if False else select(Notification.id).where(Notification.recipient_user_id == ids["student"])
-        )
-        assert count is not None
+        rows = (await session.scalars(
+            select(Notification).where(Notification.recipient_user_id == ids["student"])
+        )).all()
+        assert rows
 
 
 @pytest.mark.asyncio
