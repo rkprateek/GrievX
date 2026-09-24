@@ -56,3 +56,44 @@ users --< audit_logs
 ## 5. Lifecycle retention
 
 Soft-delete is not used for auditable complaints. User account deactivation preserves required operational history. Evidence and personal data retention/deletion schedules require campus policy approval before implementation; object deletion must be coordinated with database records and audit logging.
+
+
+## 6. Week 5 implemented schema additions
+
+Migration `0003_admin_complaint_management` extends the Week 4 complaint record with:
+
+- `priority` with default `MEDIUM`.
+- `department_id` for operational ownership.
+- `assigned_staff_id` for current staff assignment.
+
+It also creates:
+
+- `staff_assignments` for assignment history.
+- `audit_logs` for append-only administrative actions.
+
+The implemented lifecycle statuses are `SUBMITTED`, `ASSIGNED`, `IN_PROGRESS`, `RESOLVED`, `CLOSED`, and `REJECTED`. Every successful status change records the previous and next state in `complaint_status_history`.
+
+The current implementation uses the existing repository's integer department identifiers and string UUID user/complaint identifiers; the broader design above remains the target model for later normalization work.
+
+## 7. Week 6 implemented notification schema
+
+Migration 0004_notifications creates the implemented notifications table:
+
+| Field | Purpose |
+| --- | --- |
+| id | Notification UUID |
+| recipient_user_id | Authenticated recipient |
+| complaint_id | Optional related complaint |
+| type | Notification event type |
+| title | Short notification heading |
+| message | Human-readable notification body |
+| read_at | Null until the recipient marks it read |
+| created_at | UTC creation timestamp |
+
+Indexes support recipient, complaint, and notification-type lookups. Foreign keys preserve referential integrity.
+
+Notification rows are the in-app source of truth. WebSocket delivery is an additional real-time transport and is not required for historical notification retrieval.
+
+### Week 6 lifecycle integrity
+
+The implemented service records each successful status transition and creates the relevant notification(s) in the same transaction. Real-time publication happens after commit, so a failed database transaction does not intentionally publish a lifecycle event.

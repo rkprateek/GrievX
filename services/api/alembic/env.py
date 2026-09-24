@@ -6,6 +6,8 @@ from sqlalchemy import engine_from_config, pool
 from app.core.config import get_settings
 from app.models.base import Base
 from app.models.auth import Department, Role, User  # noqa: F401
+from app.models.complaint import Complaint, ComplaintImage, ComplaintStatusHistory  # noqa: F401
+from app.models.notification import Notification  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", get_settings().database_url.replace("+asyncpg", ""))
