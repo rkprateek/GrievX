@@ -180,6 +180,17 @@ async def notify_department_heads(
             )
         )
     ).all()
+    if not heads:
+        heads = (
+            await db.scalars(
+                select(User)
+                .join(User.role)
+                .where(
+                    User.is_active.is_(True),
+                    User.role.has(name=RoleName.ADMIN.value),
+                )
+            )
+        ).all()
     department_name = complaint.department.name if complaint.department else "the assigned department"
     for head in heads:
         notifications.append(
