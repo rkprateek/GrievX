@@ -108,3 +108,39 @@ No AI classification, prioritization, routing, duplicate detection, incident clu
 ### Week 5 boundary
 
 No ML classification, priority prediction, auto-routing, duplicate detection, incident clustering, or other Week 6+ functionality was implemented.
+
+
+## Week 6 - Complaint Lifecycle and Real-Time Notifications
+
+### Completed
+
+- Implemented the complaint lifecycle with the existing SUBMITTED -> ASSIGNED -> IN_PROGRESS -> RESOLVED -> CLOSED flow while preserving the Week 5 administrative REJECTED terminal path.
+- Kept complaint_status_history append-only for every successful lifecycle transition, including the automatic SUBMITTED -> ASSIGNED transition when a staff member is first assigned.
+- Added the notifications database table through Alembic migration 0004_notifications.
+- Added notification events for complaint submitted, department assigned, staff assigned, status changed, and complaint resolved.
+- Notification recipients are permission-aware: the reporting student, assigned staff, relevant department heads, and active admins.
+- Added authenticated notification list/read APIs with owner-only access.
+- Added a WebSocket endpoint at /ws/notifications using JWT authentication and an in-process connection manager.
+- Added realtime event publishing after successful database commits; the API remains the source of truth when a client is offline.
+- Updated the student mobile app to show the current complaint status, a timestamped status timeline, and an in-app notifications tab with realtime refresh.
+- Updated the operations dashboard to refresh complaint state on realtime notification events and retain a 15-second fallback refresh.
+- Added Week 6 backend tests for lifecycle transitions, status history, notification creation, authorization, notification ownership, and testable realtime broadcasting.
+
+### Verification
+
+| Check | Result |
+| --- | --- |
+| Complaint lifecycle | Implemented |
+| Status history | Recorded for every successful status change |
+| Notification table/migration | Added |
+| Notification event creation | Implemented |
+| Notification authorization | Tested |
+| WebSocket realtime architecture | Implemented |
+| Realtime unit coverage | Added |
+| Student timeline/notifications UI | Added |
+| Admin realtime state refresh | Added |
+| ML/Week 7+ functionality | Not implemented |
+
+### Week 6 boundary
+
+No ML classification, priority prediction, duplicate detection, incident clustering, or other Week 7+ functionality was started.
