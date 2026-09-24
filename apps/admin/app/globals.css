@@ -85,3 +85,13 @@ tbody tr:hover, .selected-row { background: #f4f9fe; }
 @media (max-width: 1250px) { .admin-shell { grid-template-columns: 210px minmax(0,1fr); }.admin-main { padding: 28px 22px 44px; }.workspace { grid-template-columns: 1fr; }.detail-panel { position: static; max-height: none; }.filters { grid-template-columns: 1fr repeat(3, minmax(100px, 1fr)); }.filters select:nth-of-type(4) { display: none; } }
 @media (max-width: 850px) { .admin-shell { display: block; }.sidebar { position: static; height: auto; padding: 14px; }.brand-lockup { padding-bottom: 14px; }.side-nav { grid-template-columns: repeat(3, 1fr); }.sidebar-footer { display: none; }.topbar { align-items: flex-start; flex-direction: column; }.stats-grid { grid-template-columns: repeat(2, 1fr); }.filters { grid-template-columns: 1fr 1fr; }.search-box { grid-column: 1 / -1; }.filters .primary-button { grid-column: span 2; } }
 @media (max-width: 520px) { .admin-main { padding: 20px 12px 35px; }.stats-grid { grid-template-columns: 1fr 1fr; gap: 8px; }.stat-card { padding: 13px; }.stat-card strong { font-size: 24px; }.side-nav { grid-template-columns: 1fr 1fr; }.topbar h1 { font-size: 25px; }.topbar-actions { width: 100%; justify-content: space-between; }.detail-grid { grid-template-columns: 1fr; }.filters { grid-template-columns: 1fr; }.filters .primary-button { grid-column: auto; }.filters .filter-button { display: none; }.image-grid { grid-template-columns: 1fr; } }
+
+.shell { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at top left, #e9f4ff 0, #f4f7fb 45%, #eef3f8 100%); }
+.login-card { width: min(440px, 100%); background: white; border: 1px solid #dce6f0; border-radius: 18px; padding: 30px; box-shadow: 0 20px 55px #173b5a16; }
+.login-brand { padding: 0 0 24px; }
+.login-card h1 { margin: 5px 0 6px; font-size: 28px; letter-spacing: -.035em; }
+.login-card .subtle { color: #718198; font-size: 13px; margin: 0 0 24px; line-height: 1.55; }
+.login-card label { display: grid; gap: 7px; color: #41556e; font-size: 11px; font-weight: 800; margin: 13px 0; }
+.login-card input { border: 1px solid #d8e3ed; background: #fbfcfe; color: #263c57; border-radius: 9px; padding: 11px 12px; outline: none; }
+.login-card input:focus { border-color: #5c9ed4; box-shadow: 0 0 0 3px #5c9ed41a; }
+.login-error { border: 1px solid #f3b9b9; background: #fff5f5; color: #a23c3c; border-radius: 9px; padding: 10px; font-size: 12px; line-height: 1.45; }
