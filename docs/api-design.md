@@ -95,3 +95,26 @@ Invalid transitions return `409 Conflict`. Successful changes append `complaint_
 - **Student:** denied access to the admin complaint-management routes.
 
 Reporter information is limited to non-secret identity fields. Password hashes and access tokens are never returned.
+
+
+## 6. Week 6 complaint lifecycle and notifications
+
+The complaint lifecycle is recorded in complaint_status_history for every successful state change:
+
+SUBMITTED -> ASSIGNED -> IN_PROGRESS -> RESOLVED -> CLOSED
+
+The existing REJECTED terminal path from Week 5 remains supported for administrative rejection.
+
+| Route | Purpose | Authorization |
+| --- | --- | --- |
+| GET /notifications | List the authenticated user's in-app notifications and unread count | Authenticated user |
+| PATCH /notifications/{id}/read | Mark an owned notification as read | Notification owner |
+| WS /ws/notifications?token=<JWT> | Receive realtime notification events | Authenticated user |
+
+Notification event types are COMPLAINT_SUBMITTED, DEPARTMENT_ASSIGNED, STAFF_ASSIGNED, STATUS_CHANGED, and COMPLAINT_RESOLVED.
+
+Recipients are scoped to the complaint stakeholders: the reporting student, assigned staff, department heads for the complaint department, and active admins. The database notification row is created in the same transaction as the lifecycle change. After commit, connected WebSocket clients receive the same event payload.
+
+The WebSocket implementation is intentionally WebSocket-first and keeps the client contract independent from transport internals. The current connection manager is in-process; Redis fan-out can be added for multi-instance deployment without changing the mobile/admin event contract.
+
+The student mobile app displays current status, an append-only timeline, and an in-app notifications tab. The operations dashboard refreshes immediately on realtime events and also uses a 15-second fallback refresh.
