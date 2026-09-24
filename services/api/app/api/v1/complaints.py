@@ -14,6 +14,7 @@ from app.infrastructure.db_session import get_db
 from app.infrastructure.storage import delete_object, upload_bytes
 from app.models.auth import RoleName, User
 from app.models.complaint import Complaint, ComplaintImage, ComplaintStatus, ComplaintStatusHistory
+from app.services.notifications import EVENT_COMPLAINT_SUBMITTED, add_notifications, publish_notifications
 
 router = APIRouter(prefix="/complaints", tags=["complaints"])
 
@@ -120,6 +121,12 @@ async def create_complaint(
     db.add(ComplaintStatusHistory(complaint_id=complaint_uuid, from_status=None, to_status=ComplaintStatus.SUBMITTED.value, changed_by=user.id))
     if image_data:
         db.add(ComplaintImage(complaint_id=complaint_uuid, object_key=object_key, original_filename=image.filename, content_type=content_type, size_bytes=len(image_data)))
+    notifications = add_notifications(
+        db,
+        user_ids=[user.id],
+        complaint=complaint,
+        event_type=EVENT_COMPLAINT_SUBMITTED,
+    )
     try:
         await db.commit()
     except Exception:
@@ -127,6 +134,7 @@ async def create_complaint(
         if image_data:
             await asyncio.to_thread(delete_object, storage_client, settings.s3_bucket, object_key)
         raise
+    await publish_notifications(notifications)
     result = await db.scalar(
         select(Complaint).options(selectinload(Complaint.images), selectinload(Complaint.status_history)).where(Complaint.id == complaint_uuid)
     )
