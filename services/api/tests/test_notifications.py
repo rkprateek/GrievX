@@ -116,6 +116,34 @@ def role_header(user_id: str, role: str, settings: Settings) -> dict[str, str]:
 
 
 @pytest.mark.asyncio
+async def test_complaint_submission_creates_notification(lifecycle_client, settings):
+    client, _, ids, _ = lifecycle_client
+    response = await client.post(
+        "/api/v1/complaints",
+        headers=role_header(ids["student"], "student", settings),
+        data={
+            "description": "Broken water tap near the student block",
+            "latitude": "12.9716",
+            "longitude": "77.5946",
+            "location_label": "Student Block",
+        },
+    )
+    assert response.status_code == 201
+    complaint_id = response.json()["id"]
+
+    notifications = await client.get(
+        "/api/v1/notifications",
+        headers=role_header(ids["student"], "student", settings),
+    )
+    assert any(
+        item["type"] == NotificationType.COMPLAINT_SUBMITTED.value
+        and item["complaint_id"] == response.json()["id"]
+        for item in notifications.json()
+    )
+    assert complaint_id.startswith("GRV-")
+
+
+@pytest.mark.asyncio
 async def test_lifecycle_status_transition_and_history(lifecycle_client, settings):
     client, session_factory, ids, _ = lifecycle_client
     headers = role_header(ids["admin"], "admin", settings)
