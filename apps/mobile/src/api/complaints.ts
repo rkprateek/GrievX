@@ -3,6 +3,7 @@ import { apiRequest } from "./client";
 export type Complaint = {
   id: string;
   status: string;
+  priority?: string;
   description: string;
   location: { latitude: number; longitude: number; label?: string | null };
   images: Array<{ id: string; object_key: string; filename?: string | null; content_type: string; size_bytes: number }>;
@@ -35,4 +36,27 @@ export function getComplaints() {
 
 export function getComplaint(id: string) {
   return apiRequest<Complaint>(`/complaints/${encodeURIComponent(id)}`);
+}
+
+
+export type NotificationItem = {
+  id: string;
+  complaint_id?: string | null;
+  event_type: string;
+  title: string;
+  body: string;
+  payload?: string | null;
+  is_read: boolean;
+  created_at: string;
+  read_at?: string | null;
+};
+
+export async function getNotifications(unreadOnly = false) {
+  return apiRequest<{ items: NotificationItem[]; unread_count: number }>(
+    `/notifications?unread_only=${unreadOnly ? "true" : "false"}`
+  );
+}
+
+export function markNotificationRead(id: string) {
+  return apiRequest<NotificationItem>(`/notifications/${encodeURIComponent(id)}/read`, { method: "PATCH" });
 }
