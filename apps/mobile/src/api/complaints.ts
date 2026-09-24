@@ -45,7 +45,7 @@ export type NotificationItem = {
   event_type: string;
   title: string;
   body: string;
-  payload?: string | null;
+  payload?: Record<string, unknown> | null;
   is_read: boolean;
   created_at: string;
   read_at?: string | null;
