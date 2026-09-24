@@ -10,6 +10,8 @@ from app.api.v1.admin_complaints import router as admin_complaints_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.complaints import router as complaints_router
 from app.api.v1.health import router as health_router
+from app.api.v1.notifications import router as notifications_router
+from app.api.v1.realtime import router as realtime_router
 from app.core.config import Settings, get_settings
 from app.infrastructure.database import check_database_connection, create_database_engine
 from app.infrastructure.redis import check_redis_connection, create_redis_client
@@ -59,6 +61,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(access_router, prefix="/api/v1")
     app.include_router(complaints_router, prefix="/api/v1")
     app.include_router(admin_complaints_router, prefix="/api/v1")
+    app.include_router(notifications_router, prefix="/api/v1")
+    app.include_router(realtime_router, prefix="/api/v1")
     return app
 
 
