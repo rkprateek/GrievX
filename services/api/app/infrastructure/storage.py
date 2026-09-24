@@ -24,3 +24,11 @@ def upload_bytes(client: BaseClient, bucket: str, object_key: str, data: bytes, 
 
 def delete_object(client: BaseClient, bucket: str, object_key: str) -> None:
     client.delete_object(Bucket=bucket, Key=object_key)
+
+
+def create_presigned_get_url(client: BaseClient, bucket: str, object_key: str, expires_in: int = 900) -> str:
+    return client.generate_presigned_url(
+        "get_object",
+        Params={"Bucket": bucket, "Key": object_key},
+        ExpiresIn=expires_in,
+    )

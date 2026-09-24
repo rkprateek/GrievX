@@ -52,3 +52,46 @@ Images are stored in MinIO using generated object keys. The original filename is
 ## 4. Future endpoint groups
 
 Lifecycle, assignment, AI review, incidents, notifications, analytics, map, model governance, and audit endpoints remain later-week work.
+
+
+## 5. Week 5 admin complaint management
+
+The Week 5 operations API is under `/api/v1/admin` and is protected by backend RBAC.
+
+| Route | Purpose | Authorization |
+| --- | --- | --- |
+| `GET /admin/overview` | Dashboard counts by lifecycle status | Admin, Staff, Department Head |
+| `GET /admin/complaints` | Searchable/sortable complaint queue | Admin, Staff, Department Head |
+| `GET /admin/complaints/{id}` | Permission-scoped complaint detail | Admin, Staff, Department Head |
+| `GET /admin/complaints/{id}/images/{image_id}` | Short-lived evidence-image URL | Admin, Staff, Department Head |
+| `GET /admin/complaints/departments` | Departments available to the operator | Role-scoped |
+| `GET /admin/complaints/staff` | Active staff available for assignment | Role-scoped |
+| `PATCH /admin/complaints/{id}/assignment` | Assign/reassign department and staff | Admin only |
+| `PATCH /admin/complaints/{id}/priority` | Manually change priority | Admin, Staff, Department Head within scope |
+| `PATCH /admin/complaints/{id}/status` | Change lifecycle status | Admin, Staff, Department Head within scope |
+
+Supported query parameters for the queue are `q`, `status`, `priority`, `department_id`, `assigned_staff_id`, `sort`, and `order`.
+
+### Week 5 lifecycle rules
+
+Valid transitions are:
+
+```text
+SUBMITTED   -> ASSIGNED, REJECTED
+ASSIGNED    -> IN_PROGRESS, REJECTED
+IN_PROGRESS -> RESOLVED, REJECTED
+RESOLVED    -> CLOSED, IN_PROGRESS
+CLOSED      -> terminal
+REJECTED    -> terminal
+```
+
+Invalid transitions return `409 Conflict`. Successful changes append `complaint_status_history` and create an administrative audit record.
+
+### Access scope
+
+- **Admin:** campus-wide complaint visibility and assignment controls.
+- **Department Head:** complaints in their department.
+- **Staff:** complaints in their department or explicitly assigned to them.
+- **Student:** denied access to the admin complaint-management routes.
+
+Reporter information is limited to non-secret identity fields. Password hashes and access tokens are never returned.

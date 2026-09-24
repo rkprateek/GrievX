@@ -122,3 +122,16 @@ Role-aware filters restrict Staff and Department Heads to their permitted queues
 - State what AI did, model/version availability, and how a human overrode it; avoid conveying unvalidated suggestions as fact.
 - Use loading, empty, error, permission-denied, offline, and retry states in every feature specification.
 - Ensure mobile capture has consent/permission explanations and preserves a draft on transient network failure.
+
+
+## 4. Week 5 implemented operations UI
+
+The Next.js operations dashboard now implements the complaint-management flow rather than only the Week 2 shell.
+
+- **Dashboard overview:** total, submitted, in-progress, and resolved counters.
+- **Complaint queue:** search by complaint/student, status and priority filters, department filter, sorting, refresh, and responsive table.
+- **Complaint detail:** description, status, priority, reporter information, department/staff assignment, campus coordinates, map link, evidence list, and status history.
+- **Operations controls:** admins can assign/reassign departments and staff; admins, staff, and department heads can change priority and status within their permitted scope.
+- **Evidence viewer:** image metadata is shown in the detail panel and the API provides a short-lived object-storage URL on request.
+- **Responsive behavior:** desktop queue/detail workspace collapses into stacked panels on smaller screens; mobile-sized controls remain usable without relying on color alone.
+- **Security:** frontend role visibility is only a usability layer; FastAPI enforces the actual permission scope.

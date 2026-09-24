@@ -71,3 +71,40 @@
 ### Week 4 boundary
 
 No AI classification, prioritization, routing, duplicate detection, incident clustering, or other Week 5 functionality was implemented.
+
+
+## Week 5 - Admin Complaint Management
+
+### Completed
+
+- Expanded complaint lifecycle support to `SUBMITTED`, `ASSIGNED`, `IN_PROGRESS`, `RESOLVED`, `CLOSED`, and `REJECTED`.
+- Added complaint priority with manual `LOW`, `MEDIUM`, `HIGH`, and `CRITICAL` values.
+- Added department ownership and current staff assignment fields.
+- Added `staff_assignments` history and `audit_logs` persistence through Alembic migration `0003_admin_complaint_management`.
+- Added role-scoped admin complaint APIs for overview, queue search/filter/sort, detail, department/staff lookup, assignment, priority changes, status changes, and evidence-image viewing.
+- Enforced lifecycle transition rules in the backend and return `409 Conflict` for invalid transitions.
+- Admins have campus-wide visibility and assignment authority. Department Heads are limited to their department. Staff are limited to their department or explicitly assigned complaints. Students are denied admin-queue access.
+- Reporter data exposed to operations is limited to non-secret identity information.
+- Added a responsive Next.js operations dashboard with overview cards, queue filters/search/sort, complaint detail workspace, assignment controls, priority/status controls, location link, evidence viewer, and lifecycle timeline.
+- Kept ML out of Week 5 as requested.
+
+### Verification
+
+| Check | Result |
+| --- | --- |
+| Admin complaint models and migration | Added |
+| Admin/operations APIs | Added |
+| RBAC and scope enforcement | Added |
+| Status transition validation | Added |
+| Assignment and audit history | Added |
+| Responsive admin UI | Added |
+| Admin access tests | Added |
+| Staff restriction tests | Added |
+| Assignment tests | Added |
+| Status change tests | Added |
+| Invalid transition tests | Added |
+| ML functionality | Not implemented by design |
+
+### Week 5 boundary
+
+No ML classification, priority prediction, auto-routing, duplicate detection, incident clustering, or other Week 6+ functionality was implemented.
