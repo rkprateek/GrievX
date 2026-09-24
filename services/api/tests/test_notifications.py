@@ -186,6 +186,30 @@ async def test_notification_creation_and_authorization(lifecycle_client, setting
 
 
 @pytest.mark.asyncio
+async def test_assignment_creates_department_and_staff_notifications(lifecycle_client, settings):
+    client, _, ids, _ = lifecycle_client
+    response = await client.patch(
+        "/api/v1/admin/complaints/GRV-LIFE001/assignment",
+        headers=role_header(ids["admin"], "admin", settings),
+        json={"department_id": ids["department"], "staff_id": ids["staff"]},
+    )
+    assert response.status_code == 200
+
+    head_notifications = await client.get(
+        "/api/v1/notifications",
+        headers=role_header(ids["head"], "department_head", settings),
+    )
+    staff_notifications = await client.get(
+        "/api/v1/notifications",
+        headers=role_header(ids["staff"], "staff", settings),
+    )
+    assert head_notifications.status_code == 200
+    assert staff_notifications.status_code == 200
+    assert any(item["type"] == NotificationType.DEPARTMENT_ASSIGNED.value for item in head_notifications.json())
+    assert any(item["type"] == NotificationType.STAFF_ASSIGNED.value for item in staff_notifications.json())
+    
+
+@pytest.mark.asyncio
 async def test_resolved_creates_dedicated_resolved_notification(lifecycle_client, settings):
     client, _, ids, _ = lifecycle_client
     headers = role_header(ids["admin"], "admin", settings)
