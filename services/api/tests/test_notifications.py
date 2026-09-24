@@ -87,6 +87,7 @@ async def lifecycle_client(settings):
             status=ComplaintStatus.SUBMITTED.value,
         )
         session.add(complaint)
+        await session.flush()
         session.add(
             ComplaintStatusHistory(
                 complaint_id=complaint.id,
