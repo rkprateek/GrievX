@@ -1,10 +1,16 @@
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useFocusEffect } from "expo-router";
 
 import { getComplaint, getComplaints, Complaint, submitComplaint } from "../../src/api/complaints";
+import { getToken } from "../../src/auth/storage";
+import { environment } from "../../src/config/environment";
+
+function websocketUrl(token: string) {
+  return `${environment.apiBaseUrl.replace(/^http/, "ws")}/ws/notifications?token=${encodeURIComponent(token)}`;
+}
 
 export default function ReportScreen() {
   const [description, setDescription] = useState("");
@@ -16,9 +22,43 @@ export default function ReportScreen() {
   const [busy, setBusy] = useState(false);
 
   const loadHistory = useCallback(async () => {
-    try { setComplaints(await getComplaints()); } catch { /* auth/session errors are handled by the login flow */ }
+    try {
+      setComplaints(await getComplaints());
+    } catch {
+      // auth/session errors are handled by the login flow
+    }
   }, []);
+
   useFocusEffect(useCallback(() => { void loadHistory(); }, [loadHistory]));
+
+  useEffect(() => {
+    let socket: WebSocket | undefined;
+    let cancelled = false;
+
+    (async () => {
+      const token = await getToken();
+      if (!token || cancelled) return;
+      socket = new WebSocket(websocketUrl(token));
+      socket.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          if (message.event === "complaint.updated" || message.event === "notification") {
+            void loadHistory();
+            if (selected && message.complaint_id === selected.id) {
+              void getComplaint(selected.id).then(setSelected).catch(() => undefined);
+            }
+          }
+        } catch {
+          // Ignore malformed real-time payloads.
+        }
+      };
+    })();
+
+    return () => {
+      cancelled = true;
+      socket?.close();
+    };
+  }, [loadHistory, selected]);
 
   async function captureImage() {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
@@ -59,16 +99,26 @@ export default function ReportScreen() {
         description, latitude: location.coords.latitude, longitude: location.coords.longitude,
         locationLabel, image,
       });
-      setDescription(""); setImage(undefined); setLocation(undefined); setLocationLabel(""); setSelected(created);
+      setDescription("");
+      setImage(undefined);
+      setLocation(undefined);
+      setLocationLabel("");
+      setSelected(created);
       await loadHistory();
       Alert.alert("Complaint submitted", `Your complaint ID is ${created.id}`);
     } catch (error) {
       Alert.alert("Submission failed", error instanceof Error ? error.message : "Please try again.");
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function openComplaint(id: string) {
-    try { setSelected(await getComplaint(id)); } catch (error) { Alert.alert("Unable to load", error instanceof Error ? error.message : "Please try again."); }
+    try {
+      setSelected(await getComplaint(id));
+    } catch (error) {
+      Alert.alert("Unable to load", error instanceof Error ? error.message : "Please try again.");
+    }
   }
 
   return (
@@ -85,13 +135,74 @@ export default function ReportScreen() {
       {location && <Text style={styles.location}>{location.coords.latitude.toFixed(5)}, {location.coords.longitude.toFixed(5)}</Text>}
       <TextInput style={styles.input} placeholder="Location label (optional)" value={locationLabel} onChangeText={setLocationLabel} maxLength={255} />
       <Pressable style={[styles.submit, busy && styles.disabled]} disabled={busy} onPress={submit}>{busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitText}>Submit complaint</Text>}</Pressable>
-      {selected && <View style={styles.detail}><Text style={styles.detailTitle}>{selected.id}</Text><Text>Status: {selected.status}</Text><Text>{selected.description}</Text><Text>History: {selected.history.map((h) => h.to_status).join(" → ")}</Text></View>}
+
+      {selected && (
+        <View style={styles.detail}>
+          <Text style={styles.detailTitle}>{selected.id}</Text>
+          <Text style={styles.status}>Current status: {selected.status}</Text>
+          <Text style={styles.detailDescription}>{selected.description}</Text>
+          <Text style={styles.timelineTitle}>Complaint timeline</Text>
+          <View style={styles.timeline}>
+            {selected.history.map((entry, index) => (
+              <View key={`${entry.to_status}-${entry.created_at}-${index}`} style={styles.timelineItem}>
+                <View style={styles.timelineDot} />
+                <View style={styles.timelineContent}>
+                  <Text style={styles.timelineStatus}>{entry.from_status ? `${entry.from_status} → ${entry.to_status}` : entry.to_status}</Text>
+                  <Text style={styles.timelineTime}>{new Date(entry.created_at).toLocaleString()}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
       <Text style={styles.historyTitle}>Complaint history</Text>
-      {complaints.length === 0 ? <Text style={styles.muted}>No complaints submitted yet.</Text> : complaints.map((item) => <Pressable key={item.id} style={styles.card} onPress={() => openComplaint(item.id)}><Text style={styles.cardTitle}>{item.id}</Text><Text numberOfLines={2}>{item.description}</Text><Text style={styles.muted}>{item.status}</Text></Pressable>)}
+      {complaints.length === 0 ? (
+        <Text style={styles.muted}>No complaints submitted yet.</Text>
+      ) : complaints.map((item) => (
+        <Pressable key={item.id} style={[styles.card, selected?.id === item.id && styles.selectedCard]} onPress={() => void openComplaint(item.id)}>
+          <View style={styles.cardRow}>
+            <Text style={styles.cardTitle}>{item.id}</Text>
+            <Text style={styles.statusSmall}>{item.status}</Text>
+          </View>
+          <Text numberOfLines={2}>{item.description}</Text>
+          <Text style={styles.muted}>{item.history.length} lifecycle event{item.history.length === 1 ? "" : "s"}</Text>
+        </Pressable>
+      ))}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20, gap: 12, backgroundColor: "#f5f7fb" }, title: { color: "#102a43", fontSize: 28, fontWeight: "700" }, subtitle: { color: "#52657c", lineHeight: 21 }, input: { backgroundColor: "#fff", borderWidth: 1, borderColor: "#d9e2ec", borderRadius: 10, padding: 13, fontSize: 16 }, textarea: { minHeight: 130, textAlignVertical: "top" }, row: { flexDirection: "row", gap: 10 }, secondary: { flex: 1, borderWidth: 1, borderColor: "#1267a8", borderRadius: 10, padding: 13, alignItems: "center", backgroundColor: "#fff" }, secondaryText: { color: "#1267a8", fontWeight: "700" }, preview: { width: "100%", height: 190, borderRadius: 10 }, location: { color: "#1f6f4a" }, submit: { borderRadius: 10, padding: 15, alignItems: "center", backgroundColor: "#1267a8" }, disabled: { opacity: 0.6 }, submitText: { color: "#fff", fontWeight: "700", fontSize: 16 }, historyTitle: { marginTop: 12, color: "#102a43", fontSize: 21, fontWeight: "700" }, card: { backgroundColor: "#fff", borderRadius: 10, padding: 14, gap: 5 }, cardTitle: { color: "#1267a8", fontWeight: "700" }, detail: { backgroundColor: "#fff", borderRadius: 10, padding: 15, gap: 6 }, detailTitle: { color: "#102a43", fontSize: 20, fontWeight: "700" }, muted: { color: "#6b7c93" },
+  container: { padding: 20, gap: 12, backgroundColor: "#f5f7fb" },
+  title: { color: "#102a43", fontSize: 28, fontWeight: "700" },
+  subtitle: { color: "#52657c", lineHeight: 21 },
+  input: { backgroundColor: "#fff", borderWidth: 1, borderColor: "#d9e2ec", borderRadius: 10, padding: 13, fontSize: 16 },
+  textarea: { minHeight: 130, textAlignVertical: "top" },
+  row: { flexDirection: "row", gap: 10 },
+  secondary: { flex: 1, borderWidth: 1, borderColor: "#1267a8", borderRadius: 10, padding: 13, alignItems: "center", backgroundColor: "#fff" },
+  secondaryText: { color: "#1267a8", fontWeight: "700" },
+  preview: { width: "100%", height: 190, borderRadius: 10 },
+  location: { color: "#1f6f4a" },
+  submit: { borderRadius: 10, padding: 15, alignItems: "center", backgroundColor: "#1267a8" },
+  disabled: { opacity: 0.6 },
+  submitText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  historyTitle: { marginTop: 12, color: "#102a43", fontSize: 21, fontWeight: "700" },
+  card: { backgroundColor: "#fff", borderRadius: 10, padding: 14, gap: 5, borderWidth: 1, borderColor: "#dce6f0" },
+  selectedCard: { borderColor: "#1267a8" },
+  cardRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  cardTitle: { color: "#1267a8", fontWeight: "700" },
+  statusSmall: { color: "#1769aa", fontWeight: "800", fontSize: 10 },
+  detail: { backgroundColor: "#fff", borderRadius: 10, padding: 15, gap: 8, borderWidth: 1, borderColor: "#dce6f0" },
+  detailTitle: { color: "#102a43", fontSize: 20, fontWeight: "700" },
+  status: { color: "#1769aa", fontWeight: "800" },
+  detailDescription: { color: "#40566f", lineHeight: 20 },
+  timelineTitle: { color: "#30445f", fontSize: 15, fontWeight: "800", marginTop: 5 },
+  timeline: { gap: 0 },
+  timelineItem: { flexDirection: "row", gap: 10, paddingBottom: 10 },
+  timelineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: "#1769aa", marginTop: 4 },
+  timelineContent: { flex: 1 },
+  timelineStatus: { color: "#40566f", fontWeight: "700", fontSize: 12 },
+  timelineTime: { color: "#8996a5", fontSize: 10, marginTop: 2 },
+  muted: { color: "#6b7c93" },
 });
