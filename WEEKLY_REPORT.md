@@ -8,32 +8,14 @@
 - Added the provided CampusFix reference as `reference/CampusFix.pdf` and analyzed it as architectural inspiration.
 - Produced functional and non-functional requirements, role definitions, frontend/backend/ML architecture, normalized PostgreSQL design, API groups, mobile and operations-dashboard wireframes, and the complete 14-week roadmap.
 - Added project-specific engineering, security, data, ML integrity, and quality rules in `AGENTS.md`.
-- Added a `.gitignore` for secrets, dependencies, generated artefacts, and local service data.
-
-### Reference decisions
-
-CampusFix supports the choice of a modular FastAPI-centered workflow with multimodal assistance, PostgreSQL, Redis, and object storage. Its reported accuracy/latency values are not adopted. GrievX requires its own versioned datasets, evaluation reports, and human review before ML claims or automated operational use.
-
-### Verification
-
-| Check | Result |
-| --- | --- |
-| Repository inspection | Pass - repository was empty before initialization |
-| Reference PDF inspection | Pass - all 8 pages reviewed |
-| Required Week 1 documents present | Pass |
-| Markdown structural checks | Pass - all 10 required artifacts present; Markdown code fences are balanced across 360 documentation lines |
-| Application tests | Not applicable - no application code is authorized for Week 1 |
 
 ## Week 2 - Project Foundation
 
 ### Completed
 
-- Created a Git-friendly monorepo layout: `apps/mobile`, `apps/admin`, `services/api`, `services/ml`, and `infra`.
-- Added the Expo + React Native TypeScript student-app shell with typed navigation tabs for Home, Report, and Profile.
-- Added a Next.js + TypeScript + Tailwind operations-dashboard shell.
-- Added FastAPI configuration, versioned `/api/v1` routing, CORS configuration, and live/readiness health endpoints.
-- Added asynchronous PostgreSQL connection adapter, Redis adapter, and S3-compatible MinIO adapter.
-- Added Docker Compose definitions for PostgreSQL 16, Redis 7, MinIO, bucket initialization, API, and admin dashboard.
+- Created the Git-friendly monorepo foundation for mobile, admin, API, ML, and infrastructure work.
+- Added the Expo student-app shell and Next.js operations-dashboard shell.
+- Added FastAPI configuration, versioned routing, health endpoints, PostgreSQL, Redis, MinIO, and Docker Compose foundations.
 
 ### Verification
 
@@ -48,38 +30,81 @@ CampusFix supports the choice of a modular FastAPI-centered workflow with multim
 
 ### Completed
 
-- Implemented JWT-based authentication with environment-configured signing secret, algorithm, and expiration.
-- Added Argon2 password hashing and verification; raw passwords are never persisted or returned by API responses.
-- Added four roles: `student`, `staff`, `department_head`, and `admin`.
-- Added `users`, `roles`, and `departments` SQLAlchemy models.
-- Added Alembic configuration and migration `0001_auth_roles` with role seed data.
-- Added student-only registration, login, current-user (`/auth/me`), and logout/token-handling endpoints.
-- Added reusable authenticated-user and role-based authorization dependencies.
-- Added protected student, staff, department-head, and admin routes.
-- Added mobile student login/register screens and secure token storage using Expo SecureStore.
-- Added authenticated mobile profile/logout flow.
-- Added admin/staff operations login and role-aware dashboard access.
-- Added authentication/authorization tests covering valid login, invalid login, unauthenticated access, student-to-admin denial, admin access, staff access, and password non-exposure.
+- Implemented JWT authentication with environment-configured signing secret, algorithm, and expiration.
+- Added Argon2 password hashing and verification; raw passwords are never persisted or returned.
+- Added `student`, `staff`, `department_head`, and `admin` roles with users and departments.
+- Added student registration, login, logout/token handling, `/auth/me`, protected routes, and backend role authorization.
+- Added mobile student authentication with secure token storage and admin/staff role-aware dashboard access.
+- Added authentication and authorization tests.
+
+## Week 4 - Complaint Submission
+
+### Completed
+
+- Added `complaints`, `complaint_images`, and `complaint_status_history` persistence models.
+- Added Alembic migration `0002_complaints`, linked after the Week 3 authentication migration.
+- Implemented `POST /api/v1/complaints`, `GET /api/v1/complaints`, and `GET /api/v1/complaints/{id}`.
+- Restricted complaint creation and reads to authenticated students and scoped reads to the student's own complaints.
+- Added description validation, coordinate validation, optional location label validation, and authenticated-user enforcement.
+- Added JPEG, PNG, and WebP validation using both declared MIME type and actual image content verification.
+- Added a configurable 10 MiB default image-size limit.
+- Added MinIO/S3-compatible evidence storage using generated object keys and safe metadata handling.
+- Added cleanup of uploaded objects when the database transaction fails, preventing orphaned evidence objects.
+- Every new complaint starts in `SUBMITTED` status and receives an initial status-history entry.
+- Added mobile complaint reporting UI with description entry, camera capture, photo selection, current campus location capture, submission feedback, complaint ID display, and complaint history/detail viewing.
+- Added multipart support to the mobile API client.
+- Added backend tests for valid submission/retrieval, missing description, invalid image, unauthorized submission, image storage, and cross-student access isolation.
 
 ### Verification
 
 | Check | Result |
 | --- | --- |
-| Authentication source implementation | Complete |
-| Authorization implementation | Complete |
+| Complaint API implementation | Complete |
 | Database migration | Added |
-| Mobile authentication UI | Added |
-| Admin/staff portal | Added |
-| Automated authentication tests | Added; execution requires the project's Python dependencies/runtime |
-| Full test execution in this environment | Not verified - repository runtime dependencies were not available to the connected workspace |
-
-### Security notes
-
-- JWT secrets are read from environment configuration and are not committed as real secrets.
-- Passwords are hashed with Argon2 and never included in user responses.
-- Student registration always assigns the `student` role; clients cannot self-register as staff, department head, or admin.
-- Backend authorization is authoritative; frontend role checks are only a usability layer.
+| MinIO storage integration | Complete |
+| Validation/security controls | Added |
+| Mobile complaint UI | Added |
+| Complaint tests | Added |
+| Full automated test execution | Pending execution in a Python 3.12 environment with project dependencies installed |
+| Docker/MinIO live integration | Pending Docker-enabled environment |
 
 ### Week 4 boundary
 
-Week 4 will implement complaint submission, image upload, location capture, complaint history, and MinIO persistence. No complaint or AI implementation was added to Week 3.
+No AI classification, prioritization, routing, duplicate detection, incident clustering, or other Week 5 functionality was implemented.
+
+
+## Week 5 - Admin Complaint Management
+
+### Completed
+
+- Expanded complaint lifecycle support to `SUBMITTED`, `ASSIGNED`, `IN_PROGRESS`, `RESOLVED`, `CLOSED`, and `REJECTED`.
+- Added complaint priority with manual `LOW`, `MEDIUM`, `HIGH`, and `CRITICAL` values.
+- Added department ownership and current staff assignment fields.
+- Added `staff_assignments` history and `audit_logs` persistence through Alembic migration `0003_admin_complaint_management`.
+- Added role-scoped admin complaint APIs for overview, queue search/filter/sort, detail, department/staff lookup, assignment, priority changes, status changes, and evidence-image viewing.
+- Enforced lifecycle transition rules in the backend and return `409 Conflict` for invalid transitions.
+- Admins have campus-wide visibility and assignment authority. Department Heads are limited to their department. Staff are limited to their department or explicitly assigned complaints. Students are denied admin-queue access.
+- Reporter data exposed to operations is limited to non-secret identity information.
+- Added a responsive Next.js operations dashboard with overview cards, queue filters/search/sort, complaint detail workspace, assignment controls, priority/status controls, location link, evidence viewer, and lifecycle timeline.
+- Kept ML out of Week 5 as requested.
+
+### Verification
+
+| Check | Result |
+| --- | --- |
+| Admin complaint models and migration | Added |
+| Admin/operations APIs | Added |
+| RBAC and scope enforcement | Added |
+| Status transition validation | Added |
+| Assignment and audit history | Added |
+| Responsive admin UI | Added |
+| Admin access tests | Added |
+| Staff restriction tests | Added |
+| Assignment tests | Added |
+| Status change tests | Added |
+| Invalid transition tests | Added |
+| ML functionality | Not implemented by design |
+
+### Week 5 boundary
+
+No ML classification, priority prediction, auto-routing, duplicate detection, incident clustering, or other Week 6+ functionality was implemented.

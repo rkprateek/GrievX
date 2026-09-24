@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "GrievX Operations",
-  description: "Campus operations dashboard foundation",
+  description: "GrievX campus complaint management dashboard",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
