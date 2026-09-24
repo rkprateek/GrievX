@@ -21,9 +21,8 @@ from app.models.complaint import (
     StaffAssignment,
 )
 from app.models.notification import NotificationType
-from app.realtime import manager
 from app.schemas.admin_complaints import AssignmentUpdate, PriorityUpdate, StatusUpdate
-from app.services_notifications import add_notification, notification_payload, publish_complaint_update, publish_notifications
+from app.services_notifications import add_notification, publish_complaint_update, publish_notifications
 
 router = APIRouter(prefix="/admin", tags=["admin complaints"])
 
@@ -143,25 +142,6 @@ def serialize_complaint(complaint: Complaint, user: User) -> dict:
 
 
 async def realtime_scope_user_ids(db: AsyncSession, complaint: Complaint) -> list[str]:
-    role_name = User.role.property.mapper.class_.name
-    stmt = (
-        select(User.id)
-        .join(User.role)
-        .where(
-            User.is_active.is_(True),
-            or_(
-                role_name == RoleName.ADMIN.value,
-                (role_name == RoleName.DEPARTMENT_HEAD.value) & (User.department_id == complaint.department_id),
-                (role_name == RoleName.STAFF.value)
-                & (
-                    (User.department_id == complaint.department_id)
-                    | (User.id == complaint.assigned_staff_id)
-                ),
-            ),
-        )
-    )
-    # The role_name expression above is a SQLAlchemy instrumented attribute; keep the
-    # actual role filter explicit for readability and portability.
     stmt = (
         select(User.id)
         .join(User.role)
@@ -180,7 +160,6 @@ async def realtime_scope_user_ids(db: AsyncSession, complaint: Complaint) -> lis
         )
     )
     return list((await db.scalars(stmt)).all())
-
 
 async def notify_department_heads(
     db: AsyncSession,
