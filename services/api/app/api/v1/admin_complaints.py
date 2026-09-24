@@ -21,6 +21,15 @@ from app.models.complaint import (
     StaffAssignment,
 )
 from app.schemas.admin_complaints import AssignmentUpdate, PriorityUpdate, StatusUpdate
+from app.services.notifications import (
+    EVENT_COMPLAINT_RESOLVED,
+    EVENT_DEPARTMENT_ASSIGNED,
+    EVENT_STAFF_ASSIGNED,
+    EVENT_STATUS_CHANGED,
+    add_notifications,
+    publish_notifications,
+    stakeholder_user_ids,
+)
 
 router = APIRouter(prefix="/admin", tags=["admin complaints"])
 
@@ -330,11 +339,12 @@ async def update_assignment(
 
     old_department = complaint.department_id
     old_staff = complaint.assigned_staff_id
+    old_status = complaint.status
     complaint.department_id = department_id
     complaint.assigned_staff_id = staff.id if staff else None
 
+    notifications = []
     if complaint.assigned_staff_id and complaint.status == ComplaintStatus.SUBMITTED.value:
-        old_status = complaint.status
         complaint.status = ComplaintStatus.ASSIGNED.value
         db.add(
             ComplaintStatusHistory(
@@ -342,6 +352,15 @@ async def update_assignment(
                 from_status=old_status,
                 to_status=complaint.status,
                 changed_by=user.id,
+            )
+        )
+        notifications.extend(
+            add_notifications(
+                db,
+                user_ids=await stakeholder_user_ids(db, complaint),
+                complaint=complaint,
+                event_type=EVENT_STATUS_CHANGED,
+                old_status=old_status,
             )
         )
 
@@ -353,6 +372,26 @@ async def update_assignment(
             department_id=department_id,
         )
     )
+
+    if department_id is not None and department_id != old_department:
+        notifications.extend(
+            add_notifications(
+                db,
+                user_ids=await stakeholder_user_ids(db, complaint),
+                complaint=complaint,
+                event_type=EVENT_DEPARTMENT_ASSIGNED,
+            )
+        )
+    if complaint.assigned_staff_id and complaint.assigned_staff_id != old_staff:
+        notifications.extend(
+            add_notifications(
+                db,
+                user_ids=await stakeholder_user_ids(db, complaint),
+                complaint=complaint,
+                event_type=EVENT_STAFF_ASSIGNED,
+            )
+        )
+
     audit(
         db,
         user,
@@ -366,6 +405,7 @@ async def update_assignment(
         },
     )
     await db.commit()
+    await publish_notifications(notifications)
     return serialize_complaint(await load_complaint(complaint_id, user, db), user)
 
 
@@ -403,6 +443,7 @@ async def update_status(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Invalid status transition: {old_status} -> {new_status}",
         )
+
     complaint.status = new_status
     db.add(
         ComplaintStatusHistory(
@@ -413,5 +454,26 @@ async def update_status(
         )
     )
     audit(db, user, "STATUS_CHANGED", complaint, {"from": old_status, "to": new_status})
+
+    recipients = await stakeholder_user_ids(db, complaint)
+    notifications = add_notifications(
+        db,
+        user_ids=recipients,
+        complaint=complaint,
+        event_type=EVENT_STATUS_CHANGED,
+        old_status=old_status,
+    )
+    if new_status == ComplaintStatus.RESOLVED.value:
+        notifications.extend(
+            add_notifications(
+                db,
+                user_ids=recipients,
+                complaint=complaint,
+                event_type=EVENT_COMPLAINT_RESOLVED,
+                old_status=old_status,
+            )
+        )
+
     await db.commit()
+    await publish_notifications(notifications)
     return serialize_complaint(await load_complaint(complaint_id, user, db), user)
