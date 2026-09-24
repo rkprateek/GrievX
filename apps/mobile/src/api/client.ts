@@ -20,8 +20,6 @@ export async function openNotificationSocket(
   onMessage: (message: unknown) => void,
   onError?: () => void,
 ): Promise<() => void> {
-  const { getToken } = await import("../auth/storage");
-  const { environment } = await import("../config/environment");
   const token = await getToken();
   if (!token) return () => {};
 
