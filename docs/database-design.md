@@ -56,3 +56,39 @@ users --< audit_logs
 ## 5. Lifecycle retention
 
 Soft-delete is not used for auditable complaints. User account deactivation preserves required operational history. Evidence and personal data retention/deletion schedules require campus policy approval before implementation; object deletion must be coordinated with database records and audit logging.
+
+
+## 6. Week 5 implemented schema additions
+
+Migration `0003_admin_complaint_management` extends the Week 4 complaint record with:
+
+- `priority` with default `MEDIUM`.
+- `department_id` for operational ownership.
+- `assigned_staff_id` for current staff assignment.
+
+It also creates:
+
+- `staff_assignments` for assignment history.
+- `audit_logs` for append-only administrative actions.
+
+The implemented lifecycle statuses are `SUBMITTED`, `ASSIGNED`, `IN_PROGRESS`, `RESOLVED`, `CLOSED`, and `REJECTED`. Every successful status change records the previous and next state in `complaint_status_history`.
+
+The current implementation uses the existing repository's integer department identifiers and string UUID user/complaint identifiers; the broader design above remains the target model for later normalization work.
+
+
+## 7. Week 6 implemented notification schema
+
+Migration 0004_notifications adds the notifications table:
+
+| Field | Purpose |
+| --- | --- |
+| id | Notification identifier |
+| user_id | Recipient; scoped to an active GrievX user |
+| complaint_id | Related complaint, when applicable |
+| event_type | Lifecycle event such as STATUS_CHANGED |
+| title, body | Human-readable in-app message |
+| payload | Structured event data stored as JSON text |
+| is_read, read_at | Read-state tracking |
+| created_at | Notification creation time |
+
+The user_id + is_read + created_at index supports the mobile/admin notification list and unread count. Notification creation and lifecycle history are committed with the triggering complaint change so the database remains the source of truth even if no WebSocket client is connected.
