@@ -95,3 +95,30 @@ Invalid transitions return `409 Conflict`. Successful changes append `complaint_
 - **Student:** denied access to the admin complaint-management routes.
 
 Reporter information is limited to non-secret identity fields. Password hashes and access tokens are never returned.
+
+## 6. Week 6 complaint lifecycle and notifications
+
+The Week 6 lifecycle keeps the Week 5 authorization rules and adds notification delivery.
+
+### Lifecycle
+
+The requested primary flow is:
+
+SUBMITTED -> ASSIGNED -> IN_PROGRESS -> RESOLVED -> CLOSED
+
+The existing REJECTED terminal state remains supported for compatibility with the Week 5 contract.
+
+Every successful status change appends a complaint_status_history record in the same transaction.
+
+### Notification routes
+
+| Route | Purpose | Authorization |
+| --- | --- | --- |
+| GET /notifications | List current user's notifications | Authenticated user; own records |
+| GET /notifications/unread-count | Count unread notifications | Authenticated user; own records |
+| PATCH /notifications/{id}/read | Mark one notification read | Authenticated user; recipient only |
+| WS /ws/notifications?token=<JWT> | Real-time notification/lifecycle events | Valid JWT |
+
+Notification event types are COMPLAINT_SUBMITTED, DEPARTMENT_ASSIGNED, STAFF_ASSIGNED, STATUS_CHANGED, and COMPLAINT_RESOLVED.
+
+The WebSocket emits persisted notification events and scoped complaint.updated events. The current implementation is single-process; the connection-manager interface is designed so Redis pub/sub can be introduced when horizontal API scaling requires it.
