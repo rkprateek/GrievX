@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -19,7 +20,7 @@ def serialize(notification: Notification) -> dict:
         "event_type": notification.event_type,
         "title": notification.title,
         "body": notification.body,
-        "payload": notification.payload,
+        "payload": json.loads(notification.payload) if notification.payload else {},
         "is_read": notification.is_read,
         "created_at": notification.created_at,
         "read_at": notification.read_at,
