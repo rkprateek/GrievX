@@ -4,7 +4,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import asc, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload, aliased
+from sqlalchemy.orm import aliased, selectinload
 
 from app.api.deps import require_roles
 from app.core.config import get_settings
@@ -20,7 +20,10 @@ from app.models.complaint import (
     ComplaintStatusHistory,
     StaffAssignment,
 )
+from app.models.notification import NotificationType
+from app.realtime import manager
 from app.schemas.admin_complaints import AssignmentUpdate, PriorityUpdate, StatusUpdate
+from app.services_notifications import add_notification, notification_payload, publish_complaint_update, publish_notifications
 
 router = APIRouter(prefix="/admin", tags=["admin complaints"])
 
@@ -137,6 +140,79 @@ def serialize_complaint(complaint: Complaint, user: User) -> dict:
         "created_at": complaint.created_at,
         "updated_at": complaint.updated_at,
     }
+
+
+async def realtime_scope_user_ids(db: AsyncSession, complaint: Complaint) -> list[str]:
+    role_name = User.role.property.mapper.class_.name
+    stmt = (
+        select(User.id)
+        .join(User.role)
+        .where(
+            User.is_active.is_(True),
+            or_(
+                role_name == RoleName.ADMIN.value,
+                (role_name == RoleName.DEPARTMENT_HEAD.value) & (User.department_id == complaint.department_id),
+                (role_name == RoleName.STAFF.value)
+                & (
+                    (User.department_id == complaint.department_id)
+                    | (User.id == complaint.assigned_staff_id)
+                ),
+            ),
+        )
+    )
+    # The role_name expression above is a SQLAlchemy instrumented attribute; keep the
+    # actual role filter explicit for readability and portability.
+    stmt = (
+        select(User.id)
+        .join(User.role)
+        .where(
+            User.is_active.is_(True),
+            or_(
+                User.role.has(name=RoleName.ADMIN.value),
+                (User.role.has(name=RoleName.DEPARTMENT_HEAD.value))
+                & (User.department_id == complaint.department_id),
+                (User.role.has(name=RoleName.STAFF.value))
+                & (
+                    (User.department_id == complaint.department_id)
+                    | (User.id == complaint.assigned_staff_id)
+                ),
+            ),
+        )
+    )
+    return list((await db.scalars(stmt)).all())
+
+
+async def notify_department_heads(
+    db: AsyncSession,
+    complaint: Complaint,
+    old_department_id: int | None,
+    notifications: list,
+) -> None:
+    if complaint.department_id is None or complaint.department_id == old_department_id:
+        return
+    heads = (
+        await db.scalars(
+            select(User)
+            .join(User.role)
+            .where(
+                User.is_active.is_(True),
+                User.department_id == complaint.department_id,
+                User.role.has(name=RoleName.DEPARTMENT_HEAD.value),
+            )
+        )
+    ).all()
+    department_name = complaint.department.name if complaint.department else "the assigned department"
+    for head in heads:
+        notifications.append(
+            add_notification(
+                db,
+                recipient_user_id=head.id,
+                complaint_id=complaint.id,
+                notification_type=NotificationType.DEPARTMENT_ASSIGNED.value,
+                title="Department assigned",
+                message=f"{complaint.complaint_id} was assigned to {department_name}.",
+            )
+        )
 
 
 @router.get("/overview")
@@ -333,9 +409,24 @@ async def update_assignment(
     complaint.department_id = department_id
     complaint.assigned_staff_id = staff.id if staff else None
 
+    notifications = []
+    if complaint.assigned_staff_id and complaint.assigned_staff_id != old_staff:
+        notifications.append(
+            add_notification(
+                db,
+                recipient_user_id=complaint.assigned_staff_id,
+                complaint_id=complaint.id,
+                notification_type=NotificationType.STAFF_ASSIGNED.value,
+                title="Complaint assigned to you",
+                message=f"{complaint.complaint_id} was assigned to you.",
+            )
+        )
+
+    status_changed = False
+    old_status = complaint.status
     if complaint.assigned_staff_id and complaint.status == ComplaintStatus.SUBMITTED.value:
-        old_status = complaint.status
         complaint.status = ComplaintStatus.ASSIGNED.value
+        status_changed = True
         db.add(
             ComplaintStatusHistory(
                 complaint_id=complaint.id,
@@ -344,6 +435,18 @@ async def update_assignment(
                 changed_by=user.id,
             )
         )
+        notifications.append(
+            add_notification(
+                db,
+                recipient_user_id=complaint.student_id,
+                complaint_id=complaint.id,
+                notification_type=NotificationType.STATUS_CHANGED.value,
+                title="Complaint status updated",
+                message=f"{complaint.complaint_id} moved from {old_status} to {complaint.status}.",
+            )
+        )
+
+    await notify_department_heads(db, complaint, old_department, notifications)
 
     db.add(
         StaffAssignment(
@@ -366,7 +469,14 @@ async def update_assignment(
         },
     )
     await db.commit()
-    return serialize_complaint(await load_complaint(complaint_id, user, db), user)
+    for notification in notifications:
+        await db.refresh(notification)
+
+    result = await load_complaint(complaint_id, user, db)
+    ops_ids = await realtime_scope_user_ids(db, result)
+    await publish_notifications(notifications)
+    await publish_complaint_update(result.complaint_id, result.status, ops_ids + [result.student_id])
+    return serialize_complaint(result, user)
 
 
 @router.patch("/complaints/{complaint_id}/priority")
@@ -403,6 +513,7 @@ async def update_status(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Invalid status transition: {old_status} -> {new_status}",
         )
+
     complaint.status = new_status
     db.add(
         ComplaintStatusHistory(
@@ -413,5 +524,35 @@ async def update_status(
         )
     )
     audit(db, user, "STATUS_CHANGED", complaint, {"from": old_status, "to": new_status})
+
+    notifications = [
+        add_notification(
+            db,
+            recipient_user_id=complaint.student_id,
+            complaint_id=complaint.id,
+            notification_type=NotificationType.STATUS_CHANGED.value,
+            title="Complaint status updated",
+            message=f"{complaint.complaint_id} moved from {old_status} to {new_status}.",
+        )
+    ]
+    if new_status == ComplaintStatus.RESOLVED.value:
+        notifications.append(
+            add_notification(
+                db,
+                recipient_user_id=complaint.student_id,
+                complaint_id=complaint.id,
+                notification_type=NotificationType.COMPLAINT_RESOLVED.value,
+                title="Complaint resolved",
+                message=f"{complaint.complaint_id} has been marked resolved.",
+            )
+        )
+
     await db.commit()
-    return serialize_complaint(await load_complaint(complaint_id, user, db), user)
+    for notification in notifications:
+        await db.refresh(notification)
+
+    result = await load_complaint(complaint_id, user, db)
+    ops_ids = await realtime_scope_user_ids(db, result)
+    await publish_notifications(notifications)
+    await publish_complaint_update(result.complaint_id, result.status, ops_ids + [result.student_id])
+    return serialize_complaint(result, user)
