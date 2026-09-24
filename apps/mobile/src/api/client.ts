@@ -25,7 +25,7 @@ export async function openNotificationSocket(
   const token = await getToken();
   if (!token) return () => {};
 
-  const base = environment.apiBaseUrl.replace(//api\/v1\/?$/, "");
+  const base = environment.apiBaseUrl.replace(/\/api\/v1\/?$/, "");
   const socket = new WebSocket(`${base.replace(/^http/, "ws")}/ws/notifications?token=${encodeURIComponent(token)}`);
   socket.onmessage = (event) => {
     try { onMessage(JSON.parse(event.data)); } catch { /* ignore malformed events */ }
