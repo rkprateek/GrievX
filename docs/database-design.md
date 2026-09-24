@@ -74,3 +74,26 @@ It also creates:
 The implemented lifecycle statuses are `SUBMITTED`, `ASSIGNED`, `IN_PROGRESS`, `RESOLVED`, `CLOSED`, and `REJECTED`. Every successful status change records the previous and next state in `complaint_status_history`.
 
 The current implementation uses the existing repository's integer department identifiers and string UUID user/complaint identifiers; the broader design above remains the target model for later normalization work.
+
+## 7. Week 6 implemented notification schema
+
+Migration 0004_notifications creates the implemented notifications table:
+
+| Field | Purpose |
+| --- | --- |
+| id | Notification UUID |
+| recipient_user_id | Authenticated recipient |
+| complaint_id | Optional related complaint |
+| type | Notification event type |
+| title | Short notification heading |
+| message | Human-readable notification body |
+| read_at | Null until the recipient marks it read |
+| created_at | UTC creation timestamp |
+
+Indexes support recipient, complaint, and notification-type lookups. Foreign keys preserve referential integrity.
+
+Notification rows are the in-app source of truth. WebSocket delivery is an additional real-time transport and is not required for historical notification retrieval.
+
+### Week 6 lifecycle integrity
+
+The implemented service records each successful status transition and creates the relevant notification(s) in the same transaction. Real-time publication happens after commit, so a failed database transaction does not intentionally publish a lifecycle event.
