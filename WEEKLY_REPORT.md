@@ -108,3 +108,44 @@ No AI classification, prioritization, routing, duplicate detection, incident clu
 ### Week 5 boundary
 
 No ML classification, priority prediction, auto-routing, duplicate detection, incident clustering, or other Week 6+ functionality was implemented.
+
+## Week 6 - Complaint Lifecycle and Real-Time Notifications
+
+### Completed
+
+- Implemented the complete operational lifecycle: SUBMITTED -> ASSIGNED -> IN_PROGRESS -> RESOLVED -> CLOSED.
+- Preserved the existing Week 5 REJECTED terminal state for backward compatibility; the Week 6 requested lifecycle is enforced alongside it.
+- Kept complaint status history append-only: every successful status transition inserts a complaint_status_history row in the same database transaction.
+- Added persistent in-app notifications through the new notifications table.
+- Added notification events for complaint submission, department assignment, staff assignment, every status change, and complaint resolution.
+- Added authenticated notification listing, unread-count, and recipient-only mark-as-read APIs.
+- Added a FastAPI WebSocket endpoint for authenticated per-user real-time events.
+- Added scoped complaint.updated events so the student and authorized operations users can refresh complaint state without exposing unrelated complaint activity.
+- Updated the student mobile app with a lifecycle timeline, current status display, live complaint refresh, and a dedicated Alerts tab with live notifications.
+- Updated the admin operations dashboard to change complaint status, display the full lifecycle timeline, receive real-time complaint updates, and fall back to 10-second polling if the WebSocket is unavailable.
+- Added notification/realtime documentation and Week 6 verification workflow.
+- No ML, duplicate detection, incident clustering, or other Week 7 functionality was implemented.
+
+### Verification
+
+| Check | Result |
+| --- | --- |
+| Lifecycle transition enforcement | Implemented |
+| Status history | Every successful transition recorded |
+| Notification persistence | Migration 0004_notifications added |
+| Submission notification | Implemented |
+| Department-assignment notification | Implemented |
+| Staff-assignment notification | Implemented |
+| Status-change notification | Implemented |
+| Resolution notification | Implemented |
+| WebSocket authentication | Implemented |
+| Scoped real-time complaint updates | Implemented |
+| Student timeline/notifications UI | Implemented |
+| Admin live lifecycle UI | Implemented |
+| Lifecycle/notification authorization tests | Added |
+| WebSocket/manager tests | Added |
+| CI execution | Pending GitHub Actions run |
+
+### Week 6 boundary
+
+No ML classification, priority prediction, auto-routing, duplicate detection, incident clustering, analytics expansion, or other Week 7 functionality was implemented.
