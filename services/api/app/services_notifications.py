@@ -7,6 +7,10 @@ from app.models.notification import Notification
 from app.realtime import manager
 
 
+def _iso(value: datetime | None) -> str | None:
+    return value.isoformat() if value is not None else None
+
+
 def notification_payload(notification: Notification) -> dict[str, Any]:
     return {
         "id": notification.id,
@@ -14,8 +18,8 @@ def notification_payload(notification: Notification) -> dict[str, Any]:
         "title": notification.title,
         "message": notification.message,
         "complaint_id": notification.complaint_id,
-        "read_at": notification.read_at,
-        "created_at": notification.created_at,
+        "read_at": _iso(notification.read_at),
+        "created_at": _iso(notification.created_at),
     }
 
 
