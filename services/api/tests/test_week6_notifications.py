@@ -59,7 +59,7 @@ async def lifecycle_client(settings):
             description="Broken light near the library entrance",
             latitude=12.97,
             longitude=77.59,
-            department_id=department.id,
+            department_id=None,
         )
         session.add(complaint)
         await session.commit()
