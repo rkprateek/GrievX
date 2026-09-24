@@ -51,7 +51,7 @@ Images are stored in MinIO using generated object keys. The original filename is
 
 ## 4. Future endpoint groups
 
-Lifecycle, assignment, AI review, incidents, notifications, analytics, map, model governance, and audit endpoints remain later-week work.
+AI review, incidents, analytics, map, model governance, and expanded audit endpoints remain later-week work.
 
 
 ## 5. Week 5 admin complaint management
