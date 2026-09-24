@@ -74,3 +74,21 @@ It also creates:
 The implemented lifecycle statuses are `SUBMITTED`, `ASSIGNED`, `IN_PROGRESS`, `RESOLVED`, `CLOSED`, and `REJECTED`. Every successful status change records the previous and next state in `complaint_status_history`.
 
 The current implementation uses the existing repository's integer department identifiers and string UUID user/complaint identifiers; the broader design above remains the target model for later normalization work.
+
+
+## 7. Week 6 implemented notification schema
+
+Migration 0004_notifications adds the notifications table:
+
+| Field | Purpose |
+| --- | --- |
+| id | Notification identifier |
+| user_id | Recipient; scoped to an active GrievX user |
+| complaint_id | Related complaint, when applicable |
+| event_type | Lifecycle event such as STATUS_CHANGED |
+| title, body | Human-readable in-app message |
+| payload | Structured event data stored as JSON text |
+| is_read, read_at | Read-state tracking |
+| created_at | Notification creation time |
+
+The user_id + is_read + created_at index supports the mobile/admin notification list and unread count. Notification creation and lifecycle history are committed with the triggering complaint change so the database remains the source of truth even if no WebSocket client is connected.
