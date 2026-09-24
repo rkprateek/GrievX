@@ -73,6 +73,7 @@ async def load_complaint(complaint_id: str, user: User, db: AsyncSession) -> Com
             selectinload(Complaint.status_history),
         )
         .where(Complaint.complaint_id == complaint_id)
+        .execution_options(populate_existing=True)
     )
     stmt = add_scope(stmt, user)
     complaint = await db.scalar(stmt)
@@ -181,6 +182,8 @@ async def list_admin_complaints(
             selectinload(Complaint.student).selectinload(User.department),
             selectinload(Complaint.department),
             selectinload(Complaint.assigned_staff).selectinload(User.department),
+            selectinload(Complaint.images),
+            selectinload(Complaint.status_history),
         )
     )
     stmt = add_scope(stmt, user)
