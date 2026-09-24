@@ -14,6 +14,8 @@ from app.infrastructure.db_session import get_db
 from app.infrastructure.storage import delete_object, upload_bytes
 from app.models.auth import RoleName, User
 from app.models.complaint import Complaint, ComplaintImage, ComplaintStatus, ComplaintStatusHistory
+from app.models.notification import NotificationType
+from app.services_notifications import add_notification, publish_notifications
 
 router = APIRouter(prefix="/complaints", tags=["complaints"])
 
@@ -112,14 +114,43 @@ async def create_complaint(
             raise HTTPException(status_code=503, detail="Unable to store complaint image")
 
     complaint = Complaint(
-        id=complaint_uuid, complaint_id=complaint_id, student_id=user.id,
-        description=description, latitude=latitude, longitude=longitude,
-        location_label=location_label, status=ComplaintStatus.SUBMITTED.value,
+        id=complaint_uuid,
+        complaint_id=complaint_id,
+        student_id=user.id,
+        description=description,
+        latitude=latitude,
+        longitude=longitude,
+        location_label=location_label,
+        status=ComplaintStatus.SUBMITTED.value,
     )
     db.add(complaint)
-    db.add(ComplaintStatusHistory(complaint_id=complaint_uuid, from_status=None, to_status=ComplaintStatus.SUBMITTED.value, changed_by=user.id))
+    db.add(
+        ComplaintStatusHistory(
+            complaint_id=complaint_uuid,
+            from_status=None,
+            to_status=ComplaintStatus.SUBMITTED.value,
+            changed_by=user.id,
+        )
+    )
     if image_data:
-        db.add(ComplaintImage(complaint_id=complaint_uuid, object_key=object_key, original_filename=image.filename, content_type=content_type, size_bytes=len(image_data)))
+        db.add(
+            ComplaintImage(
+                complaint_id=complaint_uuid,
+                object_key=object_key,
+                original_filename=image.filename,
+                content_type=content_type,
+                size_bytes=len(image_data),
+            )
+        )
+
+    submitted_notification = add_notification(
+        db,
+        recipient_user_id=user.id,
+        complaint_id=complaint_uuid,
+        notification_type=NotificationType.COMPLAINT_SUBMITTED.value,
+        title="Complaint submitted",
+        message=f"Complaint {complaint_id} was submitted successfully.",
+    )
     try:
         await db.commit()
     except Exception:
@@ -127,9 +158,14 @@ async def create_complaint(
         if image_data:
             await asyncio.to_thread(delete_object, storage_client, settings.s3_bucket, object_key)
         raise
+
     result = await db.scalar(
-        select(Complaint).options(selectinload(Complaint.images), selectinload(Complaint.status_history)).where(Complaint.id == complaint_uuid)
+        select(Complaint)
+        .options(selectinload(Complaint.images), selectinload(Complaint.status_history))
+        .where(Complaint.id == complaint_uuid)
     )
+    await db.refresh(submitted_notification)
+    await publish_notifications([submitted_notification])
     return complaint_response(result or complaint)
 
 
